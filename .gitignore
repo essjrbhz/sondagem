@@ -10,6 +10,9 @@ backend/*.pyc
 backend/**/*.pyc
 backend/.env*
 
+# Variáveis de ambiente raiz
+.env
+
 # Dados sensíveis — Excel com dados reais do cliente
 docs/
 

@@ -25,7 +25,9 @@ services:
     # Porta 8000 acessível apenas internamente via nginx.
     # Exposta ao host somente em modo dev (comentar em produção).
     ports:
-      - "127.0.0.1:8000:8000"   # só localhost do servidor, não da rede
+      - "127.0.0.1:8088:8000"   # 8088 no host → 8000 no container (8000 ocupada por bdo_app)
+    env_file:
+      - .env
     environment:
       DATABASE_URL: postgresql://sondagem:sondagem123@db:5432/sondagem_db
       SECRET_KEY: "mude-esta-chave-em-producao-32chars-min"
@@ -63,7 +65,7 @@ services:
       - /app/node_modules
     ports:
       - "0.0.0.0:5173:5173"
-    command: npm run dev -- --host
+    command: sh -c "npm ci && npm run dev -- --host"
     depends_on:
       - backend
     profiles: ["dev"]
