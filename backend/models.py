@@ -122,9 +122,9 @@ class Projeto(Base):
     codigo           = Column(String(20), unique=True, nullable=False, index=True)
     nome             = Column(String(300), nullable=False)
     cliente_id       = Column(Integer, ForeignKey("clientes.id"), nullable=False)
-    sonda_id         = Column(Integer, ForeignKey("sondas.id"), nullable=False)  # legado — manter
-    cidade           = Column(String(100), nullable=False)
-    uf               = Column(String(2), nullable=False)
+    sonda_id         = Column(Integer, ForeignKey("sondas.id"), nullable=True)   # legado — sonda vive em Campanha no modelo novo
+    local_execucao   = Column(String(255), nullable=True)                          # antes: cidade (String 100 NOT NULL)
+    uf               = Column(String(2), nullable=True)
     # ── campos novos ──
     contrato_id      = Column(Integer, ForeignKey("contratos.id"), nullable=True)
     centro_custo     = Column(String(30), nullable=True)

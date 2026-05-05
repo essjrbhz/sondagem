@@ -48,6 +48,28 @@ _STATUS_EQUIP_MAP: dict[str, str] = {
     "venda":      "venda",
 }
 
+_STATUS_PROJETO_MAP: dict[str, str] = {
+    "em execução":  "em_execucao",
+    "em execucao":  "em_execucao",
+    "concluído":    "concluido",
+    "concluido":    "concluido",
+    "mobilização":  "mobilizacao",
+    "mobilizacao":  "mobilizacao",
+    "aguardando":   "aguardando",
+}
+
+_STATUS_CAMPANHA_MAP: dict[str, str] = {
+    "em execução":  "em_execucao",
+    "em execucao":  "em_execucao",
+    "concluída":    "concluido",
+    "concluida":    "concluido",
+    "concluído":    "concluido",
+    "concluido":    "concluido",
+    "mobilização":  "mobilizacao",
+    "mobilizacao":  "mobilizacao",
+    "aguardando":   "aguardando",
+}
+
 
 # ── SyncReport ──────────────────────────────────────────────────────────────
 
@@ -341,13 +363,205 @@ class RDOSync:
         self.db.commit()
         logger.info("sync_pessoas concluído")
 
+    # ── sync_obras ───────────────────────────────────────────────────────────
+
+    def sync_obras(self) -> None:
+        """Sincroniza GD_Projeto → tabela projetos."""
+        items = self._fetch_all_items("GD_Projeto")
+        entity = "Projeto"
+
+        for item in items:
+            idce   = item.get("id")
+            fields = item.get("fields", {})
+            nome   = (fields.get("Projeto") or fields.get("Title") or "").strip()
+
+            # filtros de descarte
+            nome_lower = nome.lower()
+            if nome_lower.startswith("z_") or "zzz" in nome_lower:
+                self.report.add_skipped(entity)
+                continue
+            if fields.get("Inativo") is True:
+                self.report.add_skipped(entity)
+                continue
+            if not nome:
+                self.report.add_skipped(entity)
+                continue
+
+            # resolver cliente via IDCE_ProjetoGrupo
+            idce_grupo = fields.get("IDCE_ProjetoGrupo")
+            cliente = None
+            if idce_grupo:
+                cliente = (
+                    self.db.query(models.Cliente)
+                    .filter(models.Cliente.idce_cliente == int(idce_grupo))
+                    .first()
+                )
+            if not cliente:
+                self.report.add_error(
+                    f"{entity} idce={idce}: cliente idce_grupo={idce_grupo} não encontrado — pulando"
+                )
+                continue
+
+            # mapear status
+            status_raw = (fields.get("ProjetoStatus") or "em execução").strip().lower()
+            status_db  = _STATUS_PROJETO_MAP.get(status_raw, "em_execucao")
+            if status_db not in _STATUS_PROJETO_MAP.values():
+                logger.warning("%s idce=%s: status '%s' sem mapeamento — usando em_execucao", entity, idce, status_raw)
+                status_db = "em_execucao"
+
+            # datas ISO → date
+            def parse_date(val):
+                if not val:
+                    return None
+                try:
+                    from datetime import date
+                    return date.fromisoformat(val[:10])
+                except Exception:
+                    return None
+
+            try:
+                existing = (
+                    self.db.query(models.Projeto)
+                    .filter(models.Projeto.idce_projeto == int(idce))
+                    .first()
+                )
+                if existing:
+                    existing.nome            = nome
+                    existing.cliente_id      = cliente.id
+                    existing.local_execucao  = fields.get("LocalExecucao")
+                    existing.centro_custo    = fields.get("CentroCusto")
+                    existing.numero_contrato = fields.get("NumeroContrato")
+                    existing.objeto_contrato = fields.get("ObjetoContrato")
+                    existing.gestor_cliente  = fields.get("GestorCliente")
+                    existing.gestor_geothra  = fields.get("GestorGeothra")
+                    existing.data_inicio     = parse_date(fields.get("DataInicio"))
+                    existing.data_termino    = parse_date(fields.get("DataTermino"))
+                    existing.status_projeto  = status_db
+                    self.report.add_updated(entity)
+                else:
+                    # codigo: usar CodigoFrenteServico se existir, senão gerar de idce
+                    codigo = fields.get("CentroCusto") or f"RDO-{idce}"
+                    # garante unicidade sem colisão
+                    if self.db.query(models.Projeto).filter(models.Projeto.codigo == codigo).first():
+                        codigo = f"RDO-{idce}"
+                    self.db.add(models.Projeto(
+                        codigo           = codigo,
+                        nome             = nome,
+                        cliente_id       = cliente.id,
+                        local_execucao   = fields.get("LocalExecucao"),
+                        centro_custo     = fields.get("CentroCusto"),
+                        numero_contrato  = fields.get("NumeroContrato"),
+                        objeto_contrato  = fields.get("ObjetoContrato"),
+                        gestor_cliente   = fields.get("GestorCliente"),
+                        gestor_geothra   = fields.get("GestorGeothra"),
+                        data_inicio      = parse_date(fields.get("DataInicio")),
+                        data_termino     = parse_date(fields.get("DataTermino")),
+                        status_projeto   = status_db,
+                        idce_projeto     = int(idce),
+                    ))
+                    self.report.add_created(entity)
+            except Exception as exc:
+                self.db.rollback()
+                self.report.add_error(f"{entity} idce={idce}: {exc}")
+
+        self.db.commit()
+        logger.info("sync_obras concluído")
+
+    # ── sync_campanhas ───────────────────────────────────────────────────────
+
+    def sync_campanhas(self) -> None:
+        """Sincroniza GD_FrenteServico → tabela campanhas."""
+        items = self._fetch_all_items("GD_FrenteServico")
+        entity = "Campanha"
+
+        for item in items:
+            idce   = item.get("id")
+            fields = item.get("fields", {})
+
+            codigo = (fields.get("CodigoFrenteServico") or "").strip()
+            nome   = (fields.get("FrenteServico") or codigo or "").strip()
+
+            # filtros de descarte
+            nome_lower = nome.lower()
+            if nome_lower.startswith("z_") or "zzz" in nome_lower:
+                self.report.add_skipped(entity)
+                continue
+            if fields.get("Inativo") is True:
+                self.report.add_skipped(entity)
+                continue
+            if not codigo:
+                self.report.add_skipped(entity)
+                continue
+
+            # resolver obra via IDCE_Projeto
+            idce_projeto = fields.get("IDCE_Projeto")
+            obra = None
+            if idce_projeto:
+                obra = (
+                    self.db.query(models.Projeto)
+                    .filter(models.Projeto.idce_projeto == int(idce_projeto))
+                    .first()
+                )
+            if not obra:
+                self.report.add_error(
+                    f"{entity} idce={idce}: obra idce_projeto={idce_projeto} não encontrada — pulando"
+                )
+                continue
+
+            # mapear status
+            status_raw = (fields.get("Status") or "em execução").strip().lower()
+            status_db  = _STATUS_CAMPANHA_MAP.get(status_raw, "em_execucao")
+
+            def parse_date(val):
+                if not val:
+                    return None
+                try:
+                    from datetime import date
+                    return date.fromisoformat(val[:10])
+                except Exception:
+                    return None
+
+            try:
+                existing = (
+                    self.db.query(models.Campanha)
+                    .filter(models.Campanha.idce_frenteservico == int(idce))
+                    .first()
+                )
+                if existing:
+                    existing.codigo       = codigo
+                    existing.descricao    = nome
+                    existing.obra_id      = obra.id
+                    existing.data_inicio  = parse_date(fields.get("DataInicio"))
+                    existing.data_termino = parse_date(fields.get("DataTermino"))
+                    existing.status       = status_db
+                    self.report.add_updated(entity)
+                else:
+                    self.db.add(models.Campanha(
+                        codigo                 = codigo,
+                        descricao              = nome,
+                        obra_id                = obra.id,
+                        data_inicio            = parse_date(fields.get("DataInicio")),
+                        data_termino           = parse_date(fields.get("DataTermino")),
+                        status                 = status_db,
+                        idce_frenteservico     = int(idce),
+                    ))
+                    self.report.add_created(entity)
+            except Exception as exc:
+                self.db.rollback()
+                self.report.add_error(f"{entity} idce={idce}: {exc}")
+
+        self.db.commit()
+        logger.info("sync_campanhas concluído")
+
     # ── entry point ──────────────────────────────────────────────────────────
 
     def run_initial_sync(self) -> SyncReport:
-        """Executa sync completo: clientes → equipamentos → pessoas."""
+        """Executa sync completo: clientes → equipamentos → pessoas → obras → campanhas."""
         self.setup()
         self.sync_clientes()
         self.sync_equipamentos()
         self.sync_pessoas()
+        self.sync_obras()
+        self.sync_campanhas()
         logger.info("Sync inicial concluído:\n%s", self.report.summary())
         return self.report
