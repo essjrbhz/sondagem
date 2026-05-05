@@ -1,0 +1,72 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: sondagem_db
+    environment:
+      POSTGRES_DB: sondagem_db
+      POSTGRES_USER: sondagem
+      POSTGRES_PASSWORD: sondagem123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sondagem -d sondagem_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sondagem_backend
+    # Porta 8000 acessível apenas internamente via nginx.
+    # Exposta ao host somente em modo dev (comentar em produção).
+    ports:
+      - "127.0.0.1:8000:8000"   # só localhost do servidor, não da rede
+    environment:
+      DATABASE_URL: postgresql://sondagem:sondagem123@db:5432/sondagem_db
+      SECRET_KEY: "mude-esta-chave-em-producao-32chars-min"
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_HOURS: 8
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - ./docs:/app/docs
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: sondagem_frontend
+    ports:
+      - "0.0.0.0:80:80"    # acessível por toda a rede local
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # Dev mode: hot-reload (sem build) — sobe com: docker compose --profile dev up
+  frontend-dev:
+    image: node:20-alpine
+    container_name: sondagem_frontend_dev
+    working_dir: /app
+    environment:
+      # Em dev o proxy do Vite usa o nome interno do container
+      VITE_BACKEND_HOST: backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "0.0.0.0:5173:5173"
+    command: npm run dev -- --host
+    depends_on:
+      - backend
+    profiles: ["dev"]
+
+volumes:
+  postgres_data:

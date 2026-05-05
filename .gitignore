@@ -1,0 +1,22 @@
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env*
+
+# Backend
+backend/__pycache__/
+backend/**/__pycache__/
+backend/*.pyc
+backend/**/*.pyc
+backend/.env*
+
+# Dados sensíveis — Excel com dados reais do cliente
+docs/
+
+# Docker volumes / dados persistidos
+postgres_data/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
