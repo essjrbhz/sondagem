@@ -27,6 +27,7 @@ RoleUsuario = Enum(
 
 TipoEquipamento = Enum(
     "sonda", "percussao", "trado_mecanico", "trado_manual", "cptu", "mach700",
+    "tripe", "trado", "radar_penetracao", "resistividade",
     name="tipo_equipamento",
 )
 
@@ -56,11 +57,13 @@ StatusRDO = Enum(
 class Cliente(Base):
     __tablename__ = "clientes"
 
-    id          = Column(Integer, primary_key=True, index=True)
-    nome        = Column(String(200), nullable=False)
-    cnpj        = Column(String(18), unique=True, nullable=True)
-    criado_em   = Column(DateTime, server_default=func.now(), nullable=False)
-    atualizado_em = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+    id              = Column(Integer, primary_key=True, index=True)
+    nome            = Column(String(200), nullable=False)
+    cnpj            = Column(String(18), unique=True, nullable=True)
+    idce_cliente    = Column(Integer, unique=True, nullable=True, index=True)
+    logotipo_url    = Column(String(500), nullable=True)
+    criado_em       = Column(DateTime, server_default=func.now(), nullable=False)
+    atualizado_em   = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
 
     projetos  = relationship("Projeto", back_populates="cliente")
     contratos = relationship("Contrato", back_populates="cliente")
@@ -143,6 +146,7 @@ class Projeto(Base):
     contrato = relationship("Contrato", back_populates="projetos")
     furos    = relationship("Furo", back_populates="projeto")
     ordens_servico = relationship("OS", back_populates="projeto")
+    campanhas      = relationship("Campanha", back_populates="obra")
 
 
 class Furo(Base):
@@ -236,7 +240,8 @@ class Campanha(Base):
     __tablename__ = "campanhas"
 
     id                       = Column(Integer, primary_key=True, index=True)
-    os_id                    = Column(Integer, ForeignKey("ordens_servico.id"), nullable=False, index=True)
+    os_id                    = Column(Integer, ForeignKey("ordens_servico.id"), nullable=True, index=True)
+    obra_id                  = Column(Integer, ForeignKey("projetos.id"), nullable=True, index=True)
     codigo                   = Column(String(30), nullable=False)
     descricao                = Column(Text, nullable=True)
     equipamento_id           = Column(Integer, ForeignKey("equipamentos.id"), nullable=True)
@@ -250,6 +255,7 @@ class Campanha(Base):
     atualizado_em            = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
 
     os                  = relationship("OS", back_populates="campanhas")
+    obra                = relationship("Projeto", back_populates="campanhas")
     equipamento         = relationship("Equipamento", back_populates="campanhas")
     coordenador_geothra = relationship("Usuario", foreign_keys=[coordenador_geothra_id], back_populates="campanhas_coordenadas")
     responsavel_medicao = relationship("Usuario", foreign_keys=[responsavel_medicao_id], back_populates="campanhas_medicao")
