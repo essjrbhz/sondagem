@@ -4,6 +4,7 @@ import { AuthProvider } from './context/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import AppLayout from './components/layout/AppLayout'
 import Login from './pages/Login'
+import MapaBrasil from './pages/MapaBrasil'
 import Dashboard from './pages/Dashboard'
 import Projetos from './pages/Projetos'
 import Furos from './pages/Furos'
@@ -25,12 +26,13 @@ export default function App() {
 
             <Route element={<ProtectedRoute />}>
               <Route element={<AppLayout />}>
+                <Route path="/mapa"       element={<MapaBrasil />} />
                 <Route path="/dashboard"  element={<Dashboard />} />
                 <Route path="/projetos"   element={<Projetos />} />
                 <Route path="/furos"      element={<Furos />} />
                 <Route path="/relatorios" element={<Relatorios />} />
                 <Route path="/usuarios"   element={<div className="text-primary font-semibold">Usuários — em breve</div>} />
-                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/" element={<Navigate to="/mapa" replace />} />
               </Route>
             </Route>
 

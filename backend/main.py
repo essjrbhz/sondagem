@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import usuarios, clientes, sondas, projetos, furos, atividades, dashboard
+from routers import usuarios, clientes, sondas, projetos, furos, atividades, dashboard, mapa
 
 app = FastAPI(
     title="Sondagens Vale Sul — API",
@@ -24,6 +24,7 @@ app.include_router(projetos.router)
 app.include_router(furos.router)
 app.include_router(atividades.router)
 app.include_router(dashboard.router)
+app.include_router(mapa.router)
 
 
 @app.get("/health", tags=["Sistema"])
