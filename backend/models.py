@@ -160,7 +160,8 @@ class Furo(Base):
 
     id               = Column(Integer, primary_key=True, index=True)
     projeto_id       = Column(Integer, ForeignKey("projetos.id"), nullable=False, index=True)  # legado — manter
-    id_furo          = Column(String(50), nullable=False)
+    idce_furo        = Column(Integer, unique=True, nullable=True, index=True)
+    id_furo          = Column(String(200), nullable=False)
     tipo_furo        = Column(String(20), nullable=True)
     coordenada_e     = Column(Numeric(12, 3), nullable=True)
     coordenada_n     = Column(Numeric(12, 3), nullable=True)
@@ -290,9 +291,10 @@ class RDO(Base):
 class RDOFuro(Base):
     __tablename__ = "rdos_furos"
 
-    id              = Column(Integer, primary_key=True, index=True)
-    rdo_id          = Column(Integer, ForeignKey("rdos.id"), nullable=False, index=True)
-    furo_id         = Column(Integer, ForeignKey("furos.id"), nullable=False, index=True)
+    id               = Column(Integer, primary_key=True, index=True)
+    rdo_id           = Column(Integer, ForeignKey("rdos.id"), nullable=False, index=True)
+    furo_id          = Column(Integer, ForeignKey("furos.id"), nullable=False, index=True)
+    idce_rdofuro     = Column(Integer, unique=True, nullable=True, index=True)
     prof_inicial_dia = Column(Numeric(7, 2), nullable=True)
     prof_final_dia   = Column(Numeric(7, 2), nullable=True)
     criado_em        = Column(DateTime, server_default=func.now(), nullable=False)

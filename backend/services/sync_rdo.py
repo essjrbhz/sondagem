@@ -553,10 +553,265 @@ class RDOSync:
         self.db.commit()
         logger.info("sync_campanhas concluído")
 
-    # ── entry point ──────────────────────────────────────────────────────────
+    # ── sync_furos ───────────────────────────────────────────────────────────
+
+    def sync_furos(self) -> None:
+        """Sincroniza GD_FrenteServicoFuro → tabela furos."""
+        items = self._fetch_all_items("GD_FrenteServicoFuro")
+        entity = "Furo"
+
+        for item in items:
+            idce   = item.get("id")
+            fields = item.get("fields", {})
+
+            if fields.get("Inativo") is True or fields.get("Remover") is True:
+                self.report.add_skipped(entity)
+                continue
+
+            id_furo = (fields.get("Furo") or "").strip()
+            if not id_furo:
+                self.report.add_skipped(entity)
+                continue
+
+            idce_frenteservico = fields.get("IDCE_FrenteServico")
+            campanha = None
+            if idce_frenteservico:
+                campanha = (
+                    self.db.query(models.Campanha)
+                    .filter(models.Campanha.idce_frenteservico == int(float(idce_frenteservico)))
+                    .first()
+                )
+            if not campanha:
+                self.report.add_error(
+                    f"{entity} idce={idce}: campanha idce_frenteservico={idce_frenteservico} não encontrada — pulando"
+                )
+                continue
+
+            raw_metros = fields.get("ValorFuroMetros")
+            prof_prevista = None
+            if raw_metros is not None:
+                try:
+                    prof_prevista = float(raw_metros)
+                except (ValueError, TypeError):
+                    pass
+
+            try:
+                existing = (
+                    self.db.query(models.Furo)
+                    .filter(models.Furo.idce_furo == int(idce))
+                    .first()
+                )
+                if existing:
+                    existing.id_furo         = id_furo
+                    existing.campanha_id      = campanha.id
+                    existing.projeto_id       = campanha.obra_id
+                    existing.prof_prevista_m  = prof_prevista
+                    self.report.add_updated(entity)
+                else:
+                    self.db.add(models.Furo(
+                        idce_furo        = int(idce),
+                        id_furo          = id_furo,
+                        campanha_id      = campanha.id,
+                        projeto_id       = campanha.obra_id,
+                        prof_prevista_m  = prof_prevista,
+                    ))
+                    self.report.add_created(entity)
+            except Exception as exc:
+                self.db.rollback()
+                self.report.add_error(f"{entity} idce={idce}: {exc}")
+
+        self.db.commit()
+        logger.info("sync_furos concluído")
+
+    # ── sync_rdos ────────────────────────────────────────────────────────────
+
+    def sync_rdos(self) -> None:
+        """Sincroniza GD_RDO → tabela rdos (apenas Status=Aprovado)."""
+        items = self._fetch_all_items("GD_RDO")
+        entity = "RDO"
+
+        def parse_date(val):
+            if not val:
+                return None
+            try:
+                from datetime import date
+                return date.fromisoformat(val[:10])
+            except Exception:
+                return None
+
+        def as_bool(val, default=False) -> bool:
+            if isinstance(val, bool):
+                return val
+            if isinstance(val, str):
+                return val.lower() in ("true", "1", "sim", "yes")
+            return default
+
+        for item in items:
+            idce   = item.get("id")
+            fields = item.get("fields", {})
+
+            if fields.get("Inativo") is True or fields.get("Remover") is True:
+                self.report.add_skipped(entity)
+                continue
+
+            status_raw = (fields.get("Status") or "").strip()
+            if status_raw.lower() != "aprovado":
+                self.report.add_skipped(entity)
+                continue
+
+            idce_frenteservico = fields.get("IDCE_RDOFrenteServico")
+            campanha = None
+            if idce_frenteservico:
+                campanha = (
+                    self.db.query(models.Campanha)
+                    .filter(models.Campanha.idce_frenteservico == int(float(idce_frenteservico)))
+                    .first()
+                )
+            if not campanha:
+                self.report.add_error(
+                    f"{entity} idce={idce}: campanha idce_frenteservico={idce_frenteservico} não encontrada — pulando"
+                )
+                continue
+
+            raw_numero = fields.get("NumeroRDO")
+            try:
+                numero_rdo = int(raw_numero) if raw_numero is not None else 0
+            except (ValueError, TypeError):
+                numero_rdo = 0
+
+            def as_numeric(val):
+                if val is None:
+                    return None
+                try:
+                    return float(val)
+                except (ValueError, TypeError):
+                    return None
+
+            try:
+                existing = (
+                    self.db.query(models.RDO)
+                    .filter(models.RDO.idce_rdo == int(idce))
+                    .first()
+                )
+                if existing:
+                    existing.campanha_id       = campanha.id
+                    existing.numero_rdo        = numero_rdo
+                    existing.data              = parse_date(fields.get("Data"))
+                    existing.tipo_rdo          = fields.get("TipoRDO")
+                    existing.status_rdo        = "aprovado"
+                    existing.tempo_manha       = fields.get("TempoManha")
+                    existing.tempo_tarde       = fields.get("TempoTarde")
+                    existing.tempo_noite       = fields.get("TempoNoite")
+                    existing.horimetro_inicial = as_numeric(fields.get("HorimetroInicial"))
+                    existing.horimetro_final   = as_numeric(fields.get("HorimetroFinal"))
+                    existing.tem_hora_extra    = as_bool(fields.get("TemHoraExtra"))
+                    existing.publicado         = as_bool(fields.get("Publicado"))
+                    self.report.add_updated(entity)
+                else:
+                    self.db.add(models.RDO(
+                        idce_rdo           = int(idce),
+                        campanha_id        = campanha.id,
+                        numero_rdo         = numero_rdo,
+                        data               = parse_date(fields.get("Data")),
+                        tipo_rdo           = fields.get("TipoRDO"),
+                        status_rdo         = "aprovado",
+                        tempo_manha        = fields.get("TempoManha"),
+                        tempo_tarde        = fields.get("TempoTarde"),
+                        tempo_noite        = fields.get("TempoNoite"),
+                        horimetro_inicial  = as_numeric(fields.get("HorimetroInicial")),
+                        horimetro_final    = as_numeric(fields.get("HorimetroFinal")),
+                        tem_hora_extra     = as_bool(fields.get("TemHoraExtra")),
+                        publicado          = as_bool(fields.get("Publicado")),
+                    ))
+                    self.report.add_created(entity)
+            except Exception as exc:
+                self.db.rollback()
+                self.report.add_error(f"{entity} idce={idce}: {exc}")
+
+        self.db.commit()
+        logger.info("sync_rdos concluído")
+
+    # ── sync_rdo_furos ───────────────────────────────────────────────────────
+
+    def sync_rdo_furos(self) -> None:
+        """Sincroniza GD_RDOFuro → tabela rdos_furos."""
+        items = self._fetch_all_items("GD_RDOFuro")
+        entity = "RDOFuro"
+
+        def as_numeric(val):
+            if val is None:
+                return None
+            try:
+                return float(val)
+            except (ValueError, TypeError):
+                return None
+
+        for item in items:
+            idce   = item.get("id")
+            fields = item.get("fields", {})
+
+            if fields.get("Inativo") is True or fields.get("Remover") is True:
+                self.report.add_skipped(entity)
+                continue
+
+            idce_rdo = fields.get("IDCE_RDO")
+            rdo = None
+            if idce_rdo:
+                rdo = (
+                    self.db.query(models.RDO)
+                    .filter(models.RDO.idce_rdo == int(float(idce_rdo)))
+                    .first()
+                )
+            if not rdo:
+                self.report.add_skipped(entity)
+                continue
+
+            idce_furo = fields.get("IDCE_FrenteServicoFuro")
+            furo = None
+            if idce_furo:
+                furo = (
+                    self.db.query(models.Furo)
+                    .filter(models.Furo.idce_furo == int(float(idce_furo)))
+                    .first()
+                )
+            if not furo:
+                self.report.add_error(
+                    f"{entity} idce={idce}: furo idce_furo={idce_furo} não encontrado — pulando"
+                )
+                continue
+
+            try:
+                existing = (
+                    self.db.query(models.RDOFuro)
+                    .filter(models.RDOFuro.idce_rdofuro == int(idce))
+                    .first()
+                )
+                if existing:
+                    existing.rdo_id           = rdo.id
+                    existing.furo_id          = furo.id
+                    existing.prof_inicial_dia = as_numeric(fields.get("FurouDe"))
+                    existing.prof_final_dia   = as_numeric(fields.get("FurouAte"))
+                    self.report.add_updated(entity)
+                else:
+                    self.db.add(models.RDOFuro(
+                        idce_rdofuro      = int(idce),
+                        rdo_id            = rdo.id,
+                        furo_id           = furo.id,
+                        prof_inicial_dia  = as_numeric(fields.get("FurouDe")),
+                        prof_final_dia    = as_numeric(fields.get("FurouAte")),
+                    ))
+                    self.report.add_created(entity)
+            except Exception as exc:
+                self.db.rollback()
+                self.report.add_error(f"{entity} idce={idce}: {exc}")
+
+        self.db.commit()
+        logger.info("sync_rdo_furos concluído")
+
+    # ── entry points ─────────────────────────────────────────────────────────
 
     def run_initial_sync(self) -> SyncReport:
-        """Executa sync completo: clientes → equipamentos → pessoas → obras → campanhas."""
+        """Executa sync parcial: clientes → equipamentos → pessoas → obras → campanhas."""
         self.setup()
         self.sync_clientes()
         self.sync_equipamentos()
@@ -564,4 +819,18 @@ class RDOSync:
         self.sync_obras()
         self.sync_campanhas()
         logger.info("Sync inicial concluído:\n%s", self.report.summary())
+        return self.report
+
+    def run_full_sync(self) -> SyncReport:
+        """Executa sync completo: clientes → equipamentos → pessoas → obras → campanhas → furos → rdos → rdo_furos."""
+        self.setup()
+        self.sync_clientes()
+        self.sync_equipamentos()
+        self.sync_pessoas()
+        self.sync_obras()
+        self.sync_campanhas()
+        self.sync_furos()
+        self.sync_rdos()
+        self.sync_rdo_furos()
+        logger.info("Sync completo concluído:\n%s", self.report.summary())
         return self.report
