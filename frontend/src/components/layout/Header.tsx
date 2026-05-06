@@ -1,6 +1,7 @@
 import { useLocation } from 'react-router-dom'
 
 const PAGE_TITLES: Record<string, string> = {
+  '/panorama':   'Panorama Operacional',
   '/dashboard':  'Dashboard',
   '/projetos':   'Projetos',
   '/furos':      'Furos',

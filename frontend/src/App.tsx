@@ -4,7 +4,7 @@ import { AuthProvider } from './context/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import AppLayout from './components/layout/AppLayout'
 import Login from './pages/Login'
-import MapaBrasil from './pages/MapaBrasil'
+import PanoramaOperacional from './pages/PanoramaOperacional'
 import Dashboard from './pages/Dashboard'
 import Projetos from './pages/Projetos'
 import Furos from './pages/Furos'
@@ -25,14 +25,16 @@ export default function App() {
             <Route path="/login" element={<Login />} />
 
             <Route element={<ProtectedRoute />}>
+              {/* Telas com sidebar (AppLayout) */}
               <Route element={<AppLayout />}>
-                <Route path="/mapa"       element={<MapaBrasil />} />
-                <Route path="/dashboard"  element={<Dashboard />} />
-                <Route path="/projetos"   element={<Projetos />} />
-                <Route path="/furos"      element={<Furos />} />
-                <Route path="/relatorios" element={<Relatorios />} />
-                <Route path="/usuarios"   element={<div className="text-primary font-semibold">Usuários — em breve</div>} />
-                <Route path="/" element={<Navigate to="/mapa" replace />} />
+                <Route path="/"            element={<Navigate to="/panorama" replace />} />
+                <Route path="/panorama"    element={<PanoramaOperacional />} />
+                <Route path="/dashboard"   element={<Dashboard />} />
+                <Route path="/projetos"    element={<Projetos />} />
+                <Route path="/furos"       element={<Furos />} />
+                <Route path="/relatorios"  element={<Relatorios />} />
+                <Route path="/usuarios"    element={<div className="text-primary font-semibold">Usuários — em breve</div>} />
+                <Route path="/campanhas/:id" element={<div className="text-primary font-semibold p-4">Ficha da campanha — em breve</div>} />
               </Route>
             </Route>
 

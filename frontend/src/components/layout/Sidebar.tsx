@@ -86,18 +86,17 @@ function Logo() {
 
 // ── Nav items ──────────────────────────────────────────────────────────────
 
-function IconMapa() {
+function IconPanorama() {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-         strokeWidth="1.5" stroke="currentColor" className="w-5 h-5">
-      <path strokeLinecap="round" strokeLinejoin="round"
-            d="M9 6.75V15m6-6v8.25m.503 3.498l4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 00-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0z" />
+    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3z" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M14 17.5h7M17.5 14v7" strokeLinecap="round" />
     </svg>
   )
 }
 
 const NAV_ITEMS = [
-  { path: '/mapa',       label: 'Mapa Operacional', icon: <IconMapa />      },
+  { path: '/panorama',   label: 'Panorama',         icon: <IconPanorama />  },
   { path: '/dashboard',  label: 'Dashboard',        icon: <IconDashboard /> },
   { path: '/projetos',   label: 'Projetos',         icon: <IconFolder />    },
   { path: '/furos',      label: 'Furos',            icon: <IconTarget />    },
