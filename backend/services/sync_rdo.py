@@ -821,6 +821,37 @@ class RDOSync:
         logger.info("Sync inicial concluído:\n%s", self.report.summary())
         return self.report
 
+    # ── geocode_obras ────────────────────────────────────────────────────────
+
+    def geocode_obras(self) -> None:
+        """Resolve lat/lng das obras com base em local_execucao. Pula as que já têm coordenadas."""
+        from services.geocoding import GeocodingService
+        geo = GeocodingService()
+        entity = "Geocoding"
+
+        obras = self.db.query(models.Projeto).filter(
+            models.Projeto.local_execucao.isnot(None),
+            (models.Projeto.latitude.is_(None)) | (models.Projeto.longitude.is_(None)),
+        ).all()
+
+        logger.info("Geocodificando %d obras...", len(obras))
+
+        for obra in obras:
+            query = geo.simplify_query(obra.local_execucao)
+            if not query:
+                self.report.add_skipped(entity)
+                continue
+            result = geo.geocode(query)
+            if result:
+                obra.latitude  = result["lat"]
+                obra.longitude = result["lng"]
+                self.report.add_updated(entity)
+                logger.info("  OK %s: %s → %.4f, %.4f", obra.codigo, query, result["lat"], result["lng"])
+            else:
+                self.report.add_error(f"Geocoding falhou para obra {obra.codigo}: '{query}'")
+
+        self.db.commit()
+
     def run_full_sync(self) -> SyncReport:
         """Executa sync completo: clientes → equipamentos → pessoas → obras → campanhas → furos → rdos → rdo_furos."""
         self.setup()
